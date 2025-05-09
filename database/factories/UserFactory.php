@@ -5,12 +5,15 @@ namespace Database\Factories;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Models\User;
+use App\Models\Role;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
  */
 class UserFactory extends Factory
 {
+    protected $model = User::class;
     /**
      * The current password being used by the factory.
      */
@@ -24,11 +27,17 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            'full_name' => fake()->name(),
+            'national_id' => $this->faker->unique->numerify('##########'), // 10-digit number as a string
+            'photo' => 'https://via.placeholder.com/150', // example placeholder image
+            'medical_council_id' => $this->faker->unique->numerify('MCId-#####'),
+            'contract_number' => $this->faker->unique->numerify('CONTRACT-########'), // 16-digit contract number
             'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
+           'role' =>$this->faker->randomElement(['supperadmin','admin','user']),
+            'status' => $this->faker->randomElement(['active', 'inactive']),
+            'address' => $this->faker->address(),
             'password' => static::$password ??= Hash::make('password'),
-            'remember_token' => Str::random(10),
+
         ];
     }
 
@@ -37,7 +46,7 @@ class UserFactory extends Factory
      */
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'email_verified_at' => null,
         ]);
     }

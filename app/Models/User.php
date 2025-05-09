@@ -18,15 +18,15 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-       
+
         'full_name',
         'national_id',
         'photo',
         'medical_council_id',
         'contract_number',
         'email',
-        'role_id',
-        'status',//active,inactive
+        'role',//supperadmin,admin,user
+        'status', //active,inactive
         'address',
         'password',
     ];
@@ -52,8 +52,23 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
-        
-     
-}
+    }
 
+    public function pharamcies()
+    {
+        return $this->hasMany(Pharamcy::class);
+    }
+    public function cheques()
+    {
+        return $this->hasMany(Cheque::class);
+    }
+    public function accounts()
+    {
+        return $this->hasMany(Account::class);
+    }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
 }//end class

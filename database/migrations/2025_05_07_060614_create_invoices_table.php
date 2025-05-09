@@ -14,15 +14,18 @@ return new class extends Migration
         Schema::create('invoices', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pharamcy_id')->constrained();
-            $table->foreignId('company_id')->constrained('distribution_companies');
+            $table->foreignId('distributor_id')->constrained();
             $table->string('invoice_number')->unique();
             $table->date('delivery_date');
-            $table->decimal('amount',10,2);
+            $table->decimal('total_amount', 15, 2);
+            $table->decimal('paid_amount', 15, 2)->default(0);
+            $table->decimal('outstanding_amount', 15, 2)->default(0);
             $table->date('due_date');
-            $table->text('discriotion')->nullable();
-            $table->text('photo')->nullable();
-            $table->enum('status',['paid','open','due','unmatured'])->nullable();
-            $table->timestamps();
+            $table->text('description')->nullable();
+            $table->string('photo')->nullable();
+            $table->enum('status', ['paid', 'open', 'due', 'unmatured'])->nullable();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+                       $table->timestamps();
         });
     }
 

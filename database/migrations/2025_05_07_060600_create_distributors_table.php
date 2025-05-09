@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('distribution_companies', function (Blueprint $table) {
+        Schema::create('distributors', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('economic_code')->unique();
-            $table->string('contact_number')->nullable();
+            $table->string('contract_number')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('email')->nullable();
             $table->text('address')->nullable();
             $table->text('national_id')->nullable();
-            $table->text('business_type')->nullable();//medicine,hygiene,supplements
+            $table->enum('business_type',['Medicinal','Medicinal plants','Medical equipment','Food supplements'])->nullable();//medicine,hygiene,supplements
             $table->text('description')->nullable();
             $table->timestamps();
         });
@@ -29,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('distribution_companies');
+        Schema::dropIfExists('distributors');
     }
 };

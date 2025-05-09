@@ -19,8 +19,8 @@ return new class extends Migration
             $table->string('medical_council_id')->nullable();
             $table->string('contract_number')->nullable();
             $table->string('email')->unique();
-            $table->foreignId('role_id')->constrained('user_roles');
-            $table->enum('status', ['active', 'inactive']);
+            $table->enum('role', ['supperadmin', 'admin','user'])->default('user');
+            $table->enum('status', ['active', 'inactive'])->default('active');
             $table->text('address')->nullable();
             $table->string('password');
             $table->timestamps();
