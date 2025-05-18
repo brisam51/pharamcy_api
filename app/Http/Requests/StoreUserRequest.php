@@ -6,6 +6,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\ValidationException;
+
 class StoreUserRequest extends FormRequest
 {
     /**
@@ -29,7 +30,6 @@ class StoreUserRequest extends FormRequest
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'medical_council_id' => 'nullable|string|max:255',
             'contract_number' => 'nullable|string|max:255',
-            'role' => 'required|in:supperadmin,admin,user',
             'status' => 'required|in:active,inactive',
             'address' => 'nullable|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -45,16 +45,15 @@ class StoreUserRequest extends FormRequest
             'national_id.required' => 'National ID is required',
             'email.required' => 'Email is required',
             'password.required' => 'Password is required',
-            'role.required' => 'Role is required',
             'status.required' => 'Status is required',
             'password_confirmation.required_with' => 'Password confirmation is required',
-           
+
         ];
     }
 
     protected function failedValidation(Validator $validator)
     {
-        throw (new \Illuminate\Validation\ValidationException( $validator))
-        ->errorBag($this->errorBag)->redirectTo($this->getRedirectUrl());
+        throw (new \Illuminate\Validation\ValidationException($validator))
+            ->errorBag($this->errorBag)->redirectTo($this->getRedirectUrl());
     }
 }

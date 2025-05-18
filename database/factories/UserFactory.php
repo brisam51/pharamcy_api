@@ -33,7 +33,7 @@ class UserFactory extends Factory
             'medical_council_id' => $this->faker->unique->numerify('MCId-#####'),
             'contract_number' => $this->faker->unique->numerify('CONTRACT-########'), // 16-digit contract number
             'email' => fake()->unique()->safeEmail(),
-           'role' =>$this->faker->randomElement(['supperadmin','admin','user']),
+          
             'status' => $this->faker->randomElement(['active', 'inactive']),
             'address' => $this->faker->address(),
             'password' => static::$password ??= Hash::make('password'),

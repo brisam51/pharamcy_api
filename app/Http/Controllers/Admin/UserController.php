@@ -8,6 +8,10 @@ use App\Http\Resources\Admin\UserResource;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
+use Exception;
+use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
@@ -16,18 +20,27 @@ class UserController extends Controller
      */
     public function index()
     {
+
+        // $query = User::query();
+        
+        // if (!auth()->user()->hasRole('superadmin')) {
+        //     $query->where('id', auth()->id());
+       
         try {
-            $users = new UserCollection(User::all());
+            $users = User::with('roles')->get();
             if ($users->isEmpty()) {
                 return response()->json(['message' => 'No users found'], 404);
             }
+            if(!Auth::user() || !Auth::user()->hasRole('superadmin')) {
+                $users = $users->where('id', Auth::id());
+            }
+           
             return response()->json(
                 [
                     'message' => 'Users retrieved successfully',
                     'status' => 200,
                     'total' => $users->count(),
-                    'data' => $users,
-
+                    'data' => new UserCollection($users),
                 ]
             );
         } catch (\Exception $e) {
@@ -42,18 +55,22 @@ class UserController extends Controller
     {
         try {
             $valited = $request->validated();
-            if ($request->hasFile('photo')) {
+            /* if ($request->hasFile('photo')) {
                 $file = $request->file('photo');
                 $filename = time() . '.' . $file->getClientOriginalExtension();
-                $file->move(public_path('uploads'), $filename);
-                $valited['photo'] = 'uploads/' . $filename;
-            }
+                $file->move(public_path('images'), $filename);
+                $valited['photo'] = 'images/' . $filename;
+            } else {
+                $valited['photo'] = null;
+            } */
+
+            $photoPath = $this->handleImage($request);
             //Add new User
             $user = User::create([
-                'full_name' => $valited['name'],
+                'full_name' => $valited['full_name'],
                 'email' => $valited['email'],
                 'national_id' => $valited['national_id'],
-                'photo' => $valited['photo'],
+                'photo' => $photoPath,
                 'medical_council_id' => $valited['medical_council_id'],
                 'contract_number' => $valited['contract_number'],
                 'role' => $valited['role'],
@@ -65,7 +82,7 @@ class UserController extends Controller
                 [
                     'message' => 'User created successfully',
                     'status' => 201,
-                    'data' => new UserResource($user),
+                    // 'data' => $valited //new UserResource($user),
                 ]
             );
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -76,19 +93,12 @@ class UserController extends Controller
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Failed to create user',
+                'message' => 'Failed to create user' . $e->getMessage(),
                 'status' => 500,
                 'data' => null,
             ]);
         }
     }
-
-
-
-
-
-
-
 
     /**
      * Display the specified resource.
@@ -119,16 +129,176 @@ class UserController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(UpdateUserRequest $request, User $user)
     {
-        //
+
+        try {
+
+            $data = $request->validated();
+            //Handel Password
+            if (isset($data['password'])) {
+                $data['password'] = bcrypt($data['password']);
+            }
+            //Handel update  photo 
+            if ($request->hasFile('photo')) {
+                $photo = $request->file('photo');
+                $photoName = time() . '.' . $photo->getClientOriginalExtension();
+                $photo->move(public_path('images'), $photoName);
+                if (!empty($user->photo)) {
+                    $oldPhotoPath = public_path('images/' . $user->photo);
+                    if (file_exists($oldPhotoPath)) {
+                        unlink($oldPhotoPath);
+                    }
+                }
+                $data['photo'] = $photoName;
+            }
+
+
+            //Update user
+            $user->update($data);
+            return response()->json(
+                [
+                    'message' => 'User updated successfully',
+                    'status' => 200,
+                    'data' => $user->refresh() //new UserResource($user->refresh()),
+                ]
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation error',
+                'status' => 422,
+                'errors' => $e->validator->errors(),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to update user' . $e->getMessage(),
+                'status' => 500,
+                'data' => null,
+            ]);
+        }
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(User $user)
     {
-        //
+        try {
+            if ($user) {
+
+                if(!empty($user->photo)){
+                    $oldPhotoPath = public_path('images/' . $user->photo);
+                    if (file_exists($oldPhotoPath)) {
+                        unlink($oldPhotoPath);
+                    } 
+                }
+                $user->delete();
+                return response()->json([
+                    'message' => 'User deleted successfully',
+                    'status' => 200,
+                    'data' => null,
+                ]);
+            } else if ($user->is_empty()) {
+                return response()->json([
+                    "message" => "User Not Found",
+                    "data" => null,
+                    "status" => 404
+                ]);
+            }
+        } catch (Exception $e) {
+            return response()->json([
+                "message" => $e->getMessage(),
+            ]);
+        }
     }
+
+    
+
+    public function handleImage($request)
+    {
+        if (!$request->hasFile('photo')) {
+            return null;
+        }
+        $image = $request->file('photo');
+        //Validate the image
+        $validated = $request->validate([
+            'photo' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ]);
+        // Get the file extension
+        $extension = $image->getClientOriginalExtension();
+        // Generate a unique name for the image
+        $imageName = uniqid() . '.' . $extension;
+        // Move the image to the public directory
+        $image->move(public_path('images'), $imageName);
+        // Return the image name
+        return $imageName;
+    }  
+
+    //Assigne Role
+    public function assignRoleToUser(Request $request, User $user){
+        try{
+            $request->validate([
+                'role' => 'required|string|',
+                'role.*' => 'exists:roles,name',
+            ]);
+            //Check if the user has the role
+            if($user->hasRole($request->role)){
+                return response()->json([
+                    'message' => 'User already has this role',
+                    'status' => 400,
+                    'data' => null,
+                ]);
+            }
+            //Assign the role to the user
+            $user->assignRole($request->role);
+            return response()->json([
+                'message' => 'Role assigned successfully',
+                'status' => 200,
+                'data' => [
+                    'user' => $user,
+                    'role' => $request->role,
+                ],
+            ]);
+        }catch(\Exception $e){
+            return response()->json([
+                'message' => 'Failed to assign role',
+                'status' => 500,
+                'data' => null,
+            ]);
+        }
+    }
+
+    //Remove Role from user
+    public function removeRolesFromUser(Request $request,User $user){
+try{
+    $request->validate([
+        'role' => 'required|string|',
+        'role.*' => 'exists:roles,name',
+    ]);
+    //Check if the user has the role
+    if(!$user->hasRole($request->role)){
+        return response()->json([
+            'message' => 'User does not have this role',
+            'status' => 400,
+            'data' => null,
+        ]);
+    }
+    //Remove the role from the user
+    $user->removeRole($request->role);
+    return response()->json([
+        'message' => 'Role removed successfully',
+        'status' => 200,
+        'data' => [
+            'user' => $user,
+            'role' => $request->role,
+        ],
+    ]);
+}catch(\Illuminate\Validation\ValidationException $e){
+}catch(Exception $e){
+    
 }
+    }
+}//end class
+
+
+    
