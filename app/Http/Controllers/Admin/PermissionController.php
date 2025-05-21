@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\PermissionCollection;
 use Illuminate\Http\Request;
 use App\Http\Resources\PermissionResource;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -48,7 +49,12 @@ class PermissionController extends Controller
                 'name' => 'required|unique:permissions,name|string|max:255',
 
             ]);
-
+            if (Permission::where('name', $request->name)->exists()) {
+                return response()->json([
+                    'message' => 'Permission already exists',
+                    'statusCode' => 401
+                ]);
+            }
             $permission = Permission::create([
                 'name' => $request->name,
                 'guard_name' => 'web',
@@ -58,8 +64,22 @@ class PermissionController extends Controller
                 'message' => 'Permission created successfully',
                 "permission" =>  PermissionResource::collection(Permission::all()),
             ], 201);
+        } catch (ValidationException $e) {
+            return response()->json(
+                [
+                    'error' => 'Validation failed',
+                    'details' => $e->errors()
+                ],
+                422
+            );
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to create permission', 'details' => $e->getMessage()], 500);
+            return response()->json(
+                [
+                    'error' => 'Failed to create permission',
+                    'details' => $e->getMessage()
+                ],
+                500
+            );
         }
     }
 
@@ -88,6 +108,18 @@ class PermissionController extends Controller
             ]);
 
             $permission = Permission::findOrFail($id);
+            if (!$permission) {
+                return response()->json([
+                    'message' => "Permission with this ID not found",
+                    "statusCode" => 401
+                ]);
+            }
+            if (Permission::where('name', $request->name)->exists()) {
+                return response()->json([
+                    'message' => 'Permission already exists',
+                    'statusCode' => 401
+                ]);
+            }
             $permission->update([
                 'name' => $request->name,
             ]);
@@ -96,6 +128,14 @@ class PermissionController extends Controller
                 'message' => 'Permission updated successfully',
                 'permission' => new PermissionResource($permission),
             ]);
+        } catch (ValidationException $e) {
+            return response()->json(
+                [
+                    'error' => 'Validation failed',
+                    'details' => $e->errors()
+                ],
+                422
+            );
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to update permission', 'details' => $e->getMessage()], 500);
         }
@@ -118,6 +158,7 @@ class PermissionController extends Controller
 
             return response()->json([
                 'message' => 'Permission deleted successfully',
+                'removed_permission' => new PermissionResource($permission),
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to delete permission', 'details' => $e->getMessage()], 500);

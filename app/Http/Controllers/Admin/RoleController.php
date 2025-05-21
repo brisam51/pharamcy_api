@@ -8,7 +8,9 @@ use App\Http\Resources\Admin\RoleResource;
 use Exception;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 use Str;
+use Illuminate\Validation\ValidationException;
 
 class RoleController extends Controller
 {
@@ -22,9 +24,13 @@ class RoleController extends Controller
             if ($roles->isEmpty()) {
                 return response()->json(['message' => 'No roles found'], 404);
             }
+
             return response()->json([
-                'message' => 'Role index',
-                'roles' => new RoleCollection(Role::all())
+                'message' => 'Roles retrieved successfully',
+                'status' => 200,
+
+                'data' => new RoleCollection($roles),
+
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to fetch roles'], 500);
@@ -56,7 +62,7 @@ class RoleController extends Controller
 
             return response()->json([
                 'message' => 'Role created successfully',
-                'role' => new RoleCollection($role)
+                // 'role' => new RoleCollection($role)
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -71,16 +77,16 @@ class RoleController extends Controller
     public function show($id)
     {
         try {
-           $role=Role::find($id);
+            $role = Role::find($id);
             if (!$role) {
                 return response()->json(['message' => 'Role not found'], 404);
             }
-          $role->permissions;
+            $role->permissions;
             return response()->json([
                 'message' => 'Role fetched successfully',
                 //'role' => new RoleResource($role),
-                'role'=> (new RoleResource($role)),
-                
+                'role' => (new RoleResource($role)),
+
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -149,24 +155,48 @@ class RoleController extends Controller
 
     ///========================================Synic Permissions To Role========================
 
-   
+
     public function syncPermissions(Request $request, Role $role)
     {
         try {
             $request->validate([
-                'permissions' => 'required|array',
+                'permissions' => 'required|array|min:1',
                 'permissions.*' => 'exists:permissions,name',
             ]);
             if (!$role) {
                 return response()->json(['message' => 'Role not found'], 404);
             }
+            $requestedPermissions = $request->permissions;
+            $validPermissions = Permission::whereIn('name', $requestedPermissions)->pluck('name')->toArray();
+            if (empty($validPermissions)) {
+                return response()->json(['message' => 'No valid permissions found to sync'], 400);
+            }
+            $existingPermissions = $role->permissions()->pluck('name')->toArray() ?: [];
+            $newPermissions = array_diff($validPermissions, $existingPermissions);
+            if (empty($newPermissions)) {
+                return response()->json([
+                    'message' => 'No new permissions to sync',
+                    'existing_permissions' => $existingPermissions,
+                    'new_permissions' => []
+                ], 404);
+            }
+
             // Sync permissions with the role
-            $role->syncPermissions($request->permissions);
+            $role->syncPermissions($validPermissions);
 
             return response()->json([
                 'message' => 'Permissions synced successfully',
-                'data' => $role->permissions
+                'existing_permissions' => $existingPermissions,
+                'new_permissions' => $newPermissions
             ]);
+        } catch (ValidationException $e) {
+            return response()->json(
+                [
+                    'error' => 'Validation failed',
+                    'details' => $e->errors()
+                ],
+                422
+            );
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to sync permissions' . $e->getMessage()], 500);
         }

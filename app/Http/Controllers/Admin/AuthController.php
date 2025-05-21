@@ -13,50 +13,39 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        try{
- $validatedData = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string|min:8',
-        ]);
-          $user = User::where('email', $validatedData['email'])->first();
-          if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
-        }
-        if (!Auth::attempt($validatedData)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
-        }
-           $authenticatedUser = Auth::user();
+        try {
+            $validatedData = $request->validate([
+                'email' => 'required|email',
+                'password' => 'required|string|min:8',
+            ]);
+            $user = User::where('email', $validatedData['email'])->first();
+            if (!$user) {
+                return response()->json(['message' => 'User not found'], 404);
+            }
+            if (!Auth::attempt($validatedData)) {
+                return response()->json(['message' => 'Invalid credentials'], 401);
+            }
+            $authenticatedUser = Auth::user();
 
 
-        return response()->json(
-            [
-                'message' => 'Login successful',
-                'user' => [
-                    'id' => $authenticatedUser->id,
-                    'full_name' => $authenticatedUser->full_name,
-                    'email' => $authenticatedUser->email,
-                    'national_id' => $authenticatedUser->national_id,
-                    'photo' => $authenticatedUser->photo,
-                    'medical_council_id' => $authenticatedUser->medical_council_id,
-                    'contract_number' => $authenticatedUser->contract_number,
-                    'status' => $authenticatedUser->status,
-                    'address' => $authenticatedUser->address,
-                ],
-                'access_token' => $user->createToken('auth_token')->plainTextToken,
-                'token_type' => 'Bearer',
-                'expires_in' => 60 * 24 * 7,
-                 
-            ]
-        );
-        }catch(\Exception $e){
-             Log::error('Login error: ' . $e->getMessage());
+            return response()->json(
+                [
+                    'message' => 'Login successful',
+                    'status' => 200,
+                    'access_token' => $user->createToken('auth_token')->plainTextToken,
+                    'token_type' => 'Bearer',
+                    'expires_in' => 60 * 24 * 7,
+
+                ]
+            );
+        } catch (\Exception $e) {
+            Log::error('Login error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'Login failed',
                 'status' => 500,
                 'error' => $e->getMessage(),
             ]);
         }
-       
     }
     public function logout(Request $request)
     {
@@ -96,11 +85,11 @@ class AuthController extends Controller
                 'photo' => $photoPath,
                 'medical_council_id' => $valited['medical_council_id'],
                 'contract_number' => $valited['contract_number'],
-                            'status' => $valited['status'],
+                'status' => $valited['status'],
                 'address' => $valited['address'],
                 'password' => bcrypt($valited['password']),
             ]);
-            $user->assignRole('superadmin');
+           // $user->assignRole('user');
             return response()->json(
                 [
                     'message' => 'User created successfully',

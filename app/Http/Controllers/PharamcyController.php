@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use App\Models\Pharamcy;
 use Exception;
+use Phar;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class PharamcyController extends Controller
@@ -27,6 +28,9 @@ class PharamcyController extends Controller
          * http://127.0.0.1:8000/api/pharamcy?sort=status how to sort
          */
         try {
+
+          
+          
             $pharamcy =  QueryBuilder::for(Pharamcy::class)
                 ->defaultSort('name')
                 ->allowedFilters(['name', 'email', 'address', 'status','subscription_start_date','subscription_end_date'])
@@ -43,7 +47,7 @@ class PharamcyController extends Controller
                 "message" => "Pharmacies fetched successfully",
                 'count' => $pharamcy->count(),
                 'status' => 200,
-                'data' => new PharamcyCollection($pharamcy)
+                'data' =>  $pharamcy
 
 
 

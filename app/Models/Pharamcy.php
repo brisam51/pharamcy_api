@@ -33,16 +33,7 @@ class Pharamcy extends Model
 
     protected static function booted()
 {
-    static::addGlobalScope('user', function (Builder $builder) {
-        if (\Illuminate\Support\Facades\Auth::check()) {
-            $user = \Illuminate\Support\Facades\Auth::user();
-
-            // Check if user has "superadmin" role (fix typo)
-            if (!$user->hasRole('supperadmin')) {
-                $builder->where('user_id', $user->id);
-            }
-        }
-    });
+    
 }
 
 }//end class

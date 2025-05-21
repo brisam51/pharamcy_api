@@ -22,19 +22,19 @@ class UserController extends Controller
     {
 
         // $query = User::query();
-        
+
         // if (!auth()->user()->hasRole('superadmin')) {
         //     $query->where('id', auth()->id());
-       
+
         try {
             $users = User::with('roles')->get();
             if ($users->isEmpty()) {
                 return response()->json(['message' => 'No users found'], 404);
             }
-            if(!Auth::user() || !Auth::user()->hasRole('superadmin')) {
+            if (!Auth::user() || !Auth::user()->hasRole('superadmin')) {
                 $users = $users->where('id', Auth::id());
             }
-           
+
             return response()->json(
                 [
                     'message' => 'Users retrieved successfully',
@@ -55,14 +55,7 @@ class UserController extends Controller
     {
         try {
             $valited = $request->validated();
-            /* if ($request->hasFile('photo')) {
-                $file = $request->file('photo');
-                $filename = time() . '.' . $file->getClientOriginalExtension();
-                $file->move(public_path('images'), $filename);
-                $valited['photo'] = 'images/' . $filename;
-            } else {
-                $valited['photo'] = null;
-            } */
+
 
             $photoPath = $this->handleImage($request);
             //Add new User
@@ -73,11 +66,10 @@ class UserController extends Controller
                 'photo' => $photoPath,
                 'medical_council_id' => $valited['medical_council_id'],
                 'contract_number' => $valited['contract_number'],
-                'role' => $valited['role'],
                 'status' => $valited['status'],
                 'address' => $valited['address'],
                 'password' => bcrypt($valited['password']),
-            ]);
+            ])->assignRole('superadmin');
             return response()->json(
                 [
                     'message' => 'User created successfully',
@@ -186,11 +178,11 @@ class UserController extends Controller
         try {
             if ($user) {
 
-                if(!empty($user->photo)){
+                if (!empty($user->photo)) {
                     $oldPhotoPath = public_path('images/' . $user->photo);
                     if (file_exists($oldPhotoPath)) {
                         unlink($oldPhotoPath);
-                    } 
+                    }
                 }
                 $user->delete();
                 return response()->json([
@@ -212,7 +204,7 @@ class UserController extends Controller
         }
     }
 
-    
+
 
     public function handleImage($request)
     {
@@ -232,36 +224,45 @@ class UserController extends Controller
         $image->move(public_path('images'), $imageName);
         // Return the image name
         return $imageName;
-    }  
+    }
 
     //Assigne Role
-    public function assignRoleToUser(Request $request, User $user){
-        try{
+    public function assignRoleToUser(Request $request, User $user)
+    {
+        try {
             $request->validate([
-                'role' => 'required|string|',
-                'role.*' => 'exists:roles,name',
+                'roles' => 'required|array|min:1',
+                'roles.*' => 'exists:roles,name',
             ]);
-            //Check if the user has the role
-            if($user->hasRole($request->role)){
+            $currentRoles = $user->roles()->pluck('name')->toArray()?:[];
+            $newRoles =array_diff($request->roles, $currentRoles);  ;
+          if (empty($newRoles)) {
                 return response()->json([
                     'message' => 'User already has this role',
                     'status' => 400,
-                    'data' => null,
+                    'data' => $currentRoles,
                 ]);
             }
+           
             //Assign the role to the user
-            $user->assignRole($request->role);
+            $user->assignRole($newRoles);
+
             return response()->json([
                 'message' => 'Role assigned successfully',
                 'status' => 200,
-                'data' => [
-                    'user' => $user,
-                    'role' => $request->role,
-                ],
+                "exiting_roles" => $currentRoles,
+                'new_roles' => $newRoles,
             ]);
-        }catch(\Exception $e){
+        }catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation error',
+                'status' => 422,
+                'errors' => $e->validator->errors(),
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to assign role',
+                "error" => $e->getMessage(),
                 'status' => 500,
                 'data' => null,
             ]);
@@ -269,36 +270,89 @@ class UserController extends Controller
     }
 
     //Remove Role from user
-    public function removeRolesFromUser(Request $request,User $user){
-try{
-    $request->validate([
-        'role' => 'required|string|',
-        'role.*' => 'exists:roles,name',
-    ]);
-    //Check if the user has the role
-    if(!$user->hasRole($request->role)){
+    public function removeRolesFromUser(Request $request, User $user)
+{
+    try {
+        $request->validate([
+            'roles' => 'required|array',
+            'roles.*' => 'exists:roles,name'
+        ]);
+
+        $roles = $request->roles;
+        $removedRoles = [];
+        $notFoundRoles = [];
+
+        foreach ($roles as $role) {
+            if ($user->hasRole($role)) {
+                $user->removeRole($role);
+                $removedRoles[] = $role;
+            } else {
+                $notFoundRoles[] = $role;
+            }
+        }
+
+        $message = empty($notFoundRoles) 
+            ? 'Roles removed successfully' 
+            : 'Some roles were not found on the user: ' . implode(', ', $notFoundRoles);
+
         return response()->json([
-            'message' => 'User does not have this role',
-            'status' => 400,
-            'data' => null,
+            'message' => $message,
+            'status' => 200,
+            'removed_roles' => $removedRoles,
+            'not_found_roles' => $notFoundRoles
+        ]);
+
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $e->errors(),
+            'status' => 422
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Failed to remove roles',
+            'error' => $e->getMessage(),
+            'status' => 500
         ]);
     }
-    //Remove the role from the user
-    $user->removeRole($request->role);
-    return response()->json([
-        'message' => 'Role removed successfully',
-        'status' => 200,
-        'data' => [
-            'user' => $user,
-            'role' => $request->role,
-        ],
-    ]);
-}catch(\Illuminate\Validation\ValidationException $e){
-}catch(Exception $e){
-    
 }
+
+
+    public function getUserRoles($id)
+    {
+        try {
+            $user = User::select('id', 'full_name', 'email')->find($id);
+            $roles = $user->roles()
+                ->select('roles.id', 'roles.name')
+                ->get();
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not found',
+                    'status' => 404,
+                    'data' => null,
+                ]);
+            }
+            if ($roles->isEmpty()) {
+                return response()->json([
+                    'message' => 'No roles found for this user',
+                    'status' => 404,
+                    'data' => null,
+                ]);
+            }
+
+
+            return response()->json([
+                'message' => 'User roles retrieved successfully',
+                'status' => 200,
+                'user' => $user,
+                'roles' => $roles,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to fetch user roles' . $e->getMessage(),
+                'status' => 500,
+                'data' => null,
+            ]);
+        }
     }
 }//end class
-
-
-    
